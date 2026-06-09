@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Boys in the Boat · Sherwood → Berkeley</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    html, body, #root {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #e6d6b5;
+      font-family: Spectral, Georgia, serif;
+      color: #1b2b3a;
+      overflow: hidden;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    button { font-family: inherit; }
+
+    .log-entry:hover .log-entry-del { opacity: 0.7 !important; }
+    .log-entry-del:hover { opacity: 1 !important; color: #a8412c !important; }
+
+    *::-webkit-scrollbar { width: 8px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: #1b2b3a33; border-radius: 4px; }
+    *::-webkit-scrollbar-thumb:hover { background: #1b2b3a66; }
+  </style>
+
+  <!-- Firebase SDK (modular, from CDN). Initialized and stashed on window so
+       the Babel-transpiled app scripts below can read from it. -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, deleteDoc, doc,
+      onSnapshot, query, orderBy,
+    } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCE2ApprBlupTm5tSACe1mjP0rX1k-1qwU",
+      authDomain: "boys-in-the-boat.firebaseapp.com",
+      projectId: "boys-in-the-boat",
+      storageBucket: "boys-in-the-boat.firebasestorage.app",
+      messagingSenderId: "516600107190",
+      appId: "1:516600107190:web:a838c1ce9f84d54e1fd617",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.firebase = {
+      db,
+      collection, addDoc, deleteDoc, doc,
+      onSnapshot, query, orderBy,
+    };
+    window.dispatchEvent(new CustomEvent("firebase-ready"));
+  </script>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="app-chart.jsx"></script>
+  <script type="text/babel" src="app-log.jsx"></script>
+  <script type="text/babel" src="app-main.jsx"></script>
+</body>
+</html>
