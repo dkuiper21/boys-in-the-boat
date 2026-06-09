@@ -129,12 +129,110 @@ function ErrorScreen({ message }) {
   );
 }
 
+function useIsMobile() {
+  const [mobile, setMobile] = React.useState(() => window.innerWidth < 768);
+  React.useEffect(() => {
+    const h = () => setMobile(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return mobile;
+}
+
+function MobileApp({ data }) {
+  const [tab, setTab] = React.useState("chart");
+  const isYou = data.identity === "you";
+  const identityColor = isYou ? CHART_PALETTE.redInk : CHART_PALETTE.brass;
+
+  const switchIdentity = () => {
+    if (confirm("Switch user on this device?")) data.setIdentity(null);
+  };
+
+  return (
+    <div style={{
+      width: "100vw", height: "100vh", display: "flex", flexDirection: "column",
+      background: CHART_PALETTE.paperDeep, overflow: "hidden",
+    }}>
+      <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
+        {tab === "chart" && (
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "#bca57a",
+            backgroundImage:
+              "repeating-linear-gradient(90deg,rgba(0,0,0,0.04) 0 1px,transparent 1px 80px)," +
+              "repeating-linear-gradient(0deg,rgba(0,0,0,0.04) 0 1px,transparent 1px 80px)",
+            overflowY: "auto", WebkitOverflowScrolling: "touch",
+            display: "flex", justifyContent: "center", paddingBottom: 16,
+          }}>
+            <div style={{ width: "100%", maxWidth: 520 }}>
+              <Chart data={data} />
+            </div>
+            <button
+              onClick={switchIdentity}
+              style={{
+                position: "fixed", top: 12, right: 12,
+                background: CHART_PALETTE.paper,
+                border: `1px solid ${CHART_PALETTE.ink}`,
+                padding: "6px 12px",
+                fontFamily: "JetBrains Mono, monospace", fontSize: 10,
+                letterSpacing: ".18em", textTransform: "uppercase",
+                cursor: "pointer", zIndex: 10,
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <span style={{ width: 8, height: 8, background: identityColor, display: "inline-block" }} />
+              {isYou ? "Daniel" : "Tanner"}
+              <span style={{ opacity: 0.5 }}>switch</span>
+            </button>
+          </div>
+        )}
+        {tab === "log" && (
+          <div style={{ position: "absolute", inset: 0 }}>
+            <Logbook data={data} />
+          </div>
+        )}
+      </div>
+      <div style={{
+        height: 56, display: "flex",
+        background: CHART_PALETTE.paper,
+        borderTop: `1px solid ${CHART_PALETTE.ink}`,
+        flexShrink: 0,
+      }}>
+        {[
+          { id: "chart", label: "Chart", icon: "◈" },
+          { id: "log",   label: "Log",   icon: "≡" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              flex: 1, border: 0, background: "transparent",
+              borderBottom: tab === t.id ? `2px solid ${CHART_PALETTE.ink}` : "2px solid transparent",
+              display: "flex", flexDirection: "column", alignItems: "center",
+              justifyContent: "center", gap: 3, cursor: "pointer",
+              color: tab === t.id ? CHART_PALETTE.ink : CHART_PALETTE.inkSoft,
+            }}
+          >
+            <span style={{ fontSize: 18, lineHeight: 1 }}>{t.icon}</span>
+            <span style={{
+              fontFamily: "JetBrains Mono, monospace", fontSize: 9,
+              letterSpacing: ".18em", textTransform: "uppercase",
+            }}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NauticalApp() {
   const data = useRowingData();
+  const isMobile = useIsMobile();
 
   if (!data.identity) return <IdentityPicker onPick={data.setIdentity} />;
   if (!data.ready) return <LoadingScreen />;
   if (data.error) return <ErrorScreen message={data.error} />;
+  if (isMobile) return <MobileApp data={data} />;
 
   const switchIdentity = () => {
     if (confirm("Switch user on this device?")) data.setIdentity(null);
