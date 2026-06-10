@@ -18,6 +18,56 @@ const MILESTONES = [
   { name: "Berkeley", region: "CA", at: 1_000_000, kind: "end" },
 ];
 
+// Denser waypoint list for status text only (not drawn on the map).
+// Towns along the I-5 corridor between the milestone cities.
+const WAYPOINTS = [
+  { name: "Sherwood", region: "OR", at: 0 },
+  { name: "Wilsonville", region: "OR", at: 15_000 },
+  { name: "Woodburn", region: "OR", at: 35_000 },
+  { name: "Keizer", region: "OR", at: 52_000 },
+  { name: "Salem", region: "OR", at: 60_000 },
+  { name: "Albany", region: "OR", at: 100_000 },
+  { name: "Corvallis", region: "OR", at: 118_000 },
+  { name: "Junction City", region: "OR", at: 155_000 },
+  { name: "Eugene", region: "OR", at: 175_000 },
+  { name: "Cottage Grove", region: "OR", at: 210_000 },
+  { name: "Drain", region: "OR", at: 240_000 },
+  { name: "Sutherlin", region: "OR", at: 270_000 },
+  { name: "Roseburg", region: "OR", at: 285_000 },
+  { name: "Canyonville", region: "OR", at: 320_000 },
+  { name: "Glendale", region: "OR", at: 345_000 },
+  { name: "Grants Pass", region: "OR", at: 370_000 },
+  { name: "Rogue River", region: "OR", at: 387_000 },
+  { name: "Medford", region: "OR", at: 405_000 },
+  { name: "Ashland", region: "OR", at: 425_000 },
+  { name: "Siskiyou Summit", region: "OR", at: 440_000 },
+  { name: "Hornbrook", region: "CA", at: 460_000 },
+  { name: "Yreka", region: "CA", at: 475_000 },
+  { name: "Weed", region: "CA", at: 500_000 },
+  { name: "Mt. Shasta", region: "CA", at: 510_000 },
+  { name: "Dunsmuir", region: "CA", at: 522_000 },
+  { name: "Lakehead", region: "CA", at: 555_000 },
+  { name: "Shasta Lake", region: "CA", at: 570_000 },
+  { name: "Redding", region: "CA", at: 580_000 },
+  { name: "Anderson", region: "CA", at: 595_000 },
+  { name: "Red Bluff", region: "CA", at: 625_000 },
+  { name: "Corning", region: "CA", at: 655_000 },
+  { name: "Vina", region: "CA", at: 675_000 },
+  { name: "Chico", region: "CA", at: 700_000 },
+  { name: "Oroville", region: "CA", at: 730_000 },
+  { name: "Yuba City", region: "CA", at: 775_000 },
+  { name: "Nicolaus", region: "CA", at: 800_000 },
+  { name: "Sacramento", region: "CA", at: 830_000 },
+  { name: "Davis", region: "CA", at: 855_000 },
+  { name: "Vacaville", region: "CA", at: 895_000 },
+  { name: "Fairfield", region: "CA", at: 915_000 },
+  { name: "Vallejo", region: "CA", at: 945_000 },
+  { name: "Crockett", region: "CA", at: 955_000 },
+  { name: "Richmond", region: "CA", at: 980_000 },
+  { name: "Albany", region: "CA", at: 992_000 },
+  { name: "Berkeley", region: "CA", at: 1_000_000 },
+];
+
 function useRowingData() {
   const [sessions, setSessions] = React.useState([]);
   const [ready, setReady] = React.useState(false);
@@ -154,25 +204,25 @@ function useRowingData() {
     }));
   }, [yourPosition, tannerPosition]);
 
-  // Landmark helpers — direction-aware.
+  // Landmark helpers — direction-aware, using the dense waypoint list.
   const yourLandmark = React.useMemo(() => {
-    // Self heads south from 0 toward TOTAL.
-    let justPassed = MILESTONES[0];
-    let nextAhead = MILESTONES[MILESTONES.length - 1];
-    for (let i = 0; i < MILESTONES.length; i++) {
-      if (yourPosition >= MILESTONES[i].at) justPassed = MILESTONES[i];
-      else { nextAhead = MILESTONES[i]; break; }
+    // Daniel heads south from 0 toward TOTAL.
+    let justPassed = WAYPOINTS[0];
+    let nextAhead = WAYPOINTS[WAYPOINTS.length - 1];
+    for (let i = 0; i < WAYPOINTS.length; i++) {
+      if (yourPosition >= WAYPOINTS[i].at) justPassed = WAYPOINTS[i];
+      else { nextAhead = WAYPOINTS[i]; break; }
     }
     return { justPassed, nextAhead };
   }, [yourPosition]);
 
   const tannerLandmark = React.useMemo(() => {
     // Tanner heads north from TOTAL toward 0.
-    let justPassed = MILESTONES[MILESTONES.length - 1];
-    let nextAhead = MILESTONES[0];
-    for (let i = MILESTONES.length - 1; i >= 0; i--) {
-      if (tannerPosition <= MILESTONES[i].at) justPassed = MILESTONES[i];
-      else { nextAhead = MILESTONES[i]; break; }
+    let justPassed = WAYPOINTS[WAYPOINTS.length - 1];
+    let nextAhead = WAYPOINTS[0];
+    for (let i = WAYPOINTS.length - 1; i >= 0; i--) {
+      if (tannerPosition <= WAYPOINTS[i].at) justPassed = WAYPOINTS[i];
+      else { nextAhead = WAYPOINTS[i]; break; }
     }
     return { justPassed, nextAhead };
   }, [tannerPosition]);
@@ -216,6 +266,6 @@ function fmtDateLong(d) {
 }
 
 Object.assign(window, {
-  useRowingData, MILESTONES, TOTAL_METERS,
+  useRowingData, MILESTONES, WAYPOINTS, TOTAL_METERS,
   fmtMeters, fmtMetersFull, fmtDate, fmtDateLong,
 });

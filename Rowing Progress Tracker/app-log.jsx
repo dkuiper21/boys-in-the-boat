@@ -28,16 +28,16 @@ function LogStat({ label, value, sub, large }) {
   );
 }
 
-function ProgressMeter({ data }) {
+function ProgressMeter({ data, compact }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <span style={{
-          fontFamily: "Spectral, serif", fontSize: 56, fontWeight: 600,
+          fontFamily: "Spectral, serif", fontSize: compact ? 38 : 56, fontWeight: 600,
           letterSpacing: "-0.03em", lineHeight: 1, color: CHART_PALETTE.ink,
         }}>{(data.totals.combined / 1000).toFixed(1)}</span>
         <span style={{
-          fontFamily: "Spectral, serif", fontStyle: "italic", fontSize: 18,
+          fontFamily: "Spectral, serif", fontStyle: "italic", fontSize: compact ? 14 : 18,
           color: CHART_PALETTE.inkSoft,
         }}>of 1,000 km</span>
         <span style={{
@@ -326,8 +326,45 @@ function LogForm({ data }) {
   );
 }
 
-function Logbook({ data }) {
+function Logbook({ data, compact }) {
   const sortedDesc = [...data.sessions].sort((a, b) => b.date.localeCompare(a.date));
+
+  if (compact) {
+    // Mobile: one scrollable column, form pinned at the bottom.
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", height: "100%",
+        background: CHART_PALETTE.paper, minHeight: 0,
+      }}>
+        <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", minHeight: 0 }}>
+          <div style={{ padding: "18px 20px 14px", display: "flex", flexDirection: "column", gap: 16, borderBottom: `1px solid ${CHART_PALETTE.ink}` }}>
+            <ProgressMeter data={data} compact />
+            <CurrentBearing data={data} />
+          </div>
+          <div style={{
+            padding: "14px 20px 6px",
+            display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          }}>
+            <span style={{
+              fontFamily: "JetBrains Mono, monospace", fontSize: 9,
+              letterSpacing: ".22em", textTransform: "uppercase",
+              color: CHART_PALETTE.inkSoft,
+            }}>Entries · {data.sessions.length}</span>
+            <span style={{
+              fontFamily: "Spectral, serif", fontStyle: "italic", fontSize: 12,
+              color: CHART_PALETTE.inkSoft,
+            }}>most recent first</span>
+          </div>
+          <div style={{ padding: "0 20px 16px" }}>
+            {sortedDesc.map(s => (
+              <LogEntry key={s.id} session={s} onDelete={data.removeSession} />
+            ))}
+          </div>
+        </div>
+        <LogForm data={data} />
+      </div>
+    );
+  }
 
   return (
     <div style={{

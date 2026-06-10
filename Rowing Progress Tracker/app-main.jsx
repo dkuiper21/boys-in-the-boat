@@ -188,7 +188,7 @@ function MobileApp({ data }) {
         )}
         {tab === "log" && (
           <div style={{ position: "absolute", inset: 0 }}>
-            <Logbook data={data} />
+            <Logbook data={data} compact />
           </div>
         )}
       </div>
