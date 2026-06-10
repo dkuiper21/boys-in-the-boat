@@ -149,8 +149,8 @@ function MobileApp({ data }) {
   };
 
   return (
-    <div style={{
-      width: "100vw", height: "100vh", display: "flex", flexDirection: "column",
+    <div className="app-fill" style={{
+      display: "flex", flexDirection: "column",
       background: CHART_PALETTE.paperDeep, overflow: "hidden",
     }}>
       <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
@@ -239,8 +239,7 @@ function NauticalApp() {
   };
 
   return (
-    <div data-screen-label="Crossing · main" style={{
-      width: "100vw", height: "100vh",
+    <div data-screen-label="Crossing · main" className="app-fill" style={{
       display: "grid", gridTemplateColumns: "minmax(0, 1fr) 460px",
       background: CHART_PALETTE.paperDeep,
       fontFamily: "Spectral, serif",

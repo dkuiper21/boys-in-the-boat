@@ -330,12 +330,15 @@ function Logbook({ data, compact }) {
   const sortedDesc = [...data.sessions].sort((a, b) => b.date.localeCompare(a.date));
 
   if (compact) {
-    // Mobile: one scrollable column, form pinned at the bottom.
+    // Mobile: form at the TOP (keyboard-safe), everything else scrolls below.
     return (
       <div style={{
         display: "flex", flexDirection: "column", height: "100%",
         background: CHART_PALETTE.paper, minHeight: 0,
       }}>
+        <div style={{ borderBottom: `1px solid ${CHART_PALETTE.ink}` }}>
+          <LogForm data={data} />
+        </div>
         <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", minHeight: 0 }}>
           <div style={{ padding: "18px 20px 14px", display: "flex", flexDirection: "column", gap: 16, borderBottom: `1px solid ${CHART_PALETTE.ink}` }}>
             <ProgressMeter data={data} compact />
@@ -361,7 +364,6 @@ function Logbook({ data, compact }) {
             ))}
           </div>
         </div>
-        <LogForm data={data} />
       </div>
     );
   }

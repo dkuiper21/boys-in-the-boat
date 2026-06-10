@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>Boys in the Boat · Sherwood → Berkeley</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,6 +22,9 @@
     }
     *, *::before, *::after { box-sizing: border-box; }
     button { font-family: inherit; }
+
+    /* Full-height that tracks the *visible* viewport on mobile (keyboard, browser chrome) */
+    .app-fill { height: 100vh; height: 100dvh; width: 100vw; }
 
     .log-entry:hover .log-entry-del { opacity: 0.7 !important; }
     .log-entry-del:hover { opacity: 1 !important; color: #a8412c !important; }
