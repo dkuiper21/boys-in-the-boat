@@ -18,54 +18,55 @@ const MILESTONES = [
   { name: "Berkeley", region: "CA", at: 1_000_000, kind: "end" },
 ];
 
-// Denser waypoint list for status text only (not drawn on the map).
-// Towns along the I-5 corridor between the milestone cities.
+// Dense waypoint list along the Interstate 5 corridor. Used for the status
+// text and, via x/y (chart coordinates, same projection as app-chart.jsx),
+// as the route the tracks and boats follow on the map.
 const WAYPOINTS = [
-  { name: "Sherwood", region: "OR", at: 0 },
-  { name: "Wilsonville", region: "OR", at: 15_000 },
-  { name: "Woodburn", region: "OR", at: 35_000 },
-  { name: "Keizer", region: "OR", at: 52_000 },
-  { name: "Salem", region: "OR", at: 60_000 },
-  { name: "Albany", region: "OR", at: 100_000 },
-  { name: "Corvallis", region: "OR", at: 118_000 },
-  { name: "Junction City", region: "OR", at: 155_000 },
-  { name: "Eugene", region: "OR", at: 175_000 },
-  { name: "Cottage Grove", region: "OR", at: 210_000 },
-  { name: "Drain", region: "OR", at: 240_000 },
-  { name: "Sutherlin", region: "OR", at: 270_000 },
-  { name: "Roseburg", region: "OR", at: 285_000 },
-  { name: "Canyonville", region: "OR", at: 320_000 },
-  { name: "Glendale", region: "OR", at: 345_000 },
-  { name: "Grants Pass", region: "OR", at: 370_000 },
-  { name: "Rogue River", region: "OR", at: 387_000 },
-  { name: "Medford", region: "OR", at: 405_000 },
-  { name: "Ashland", region: "OR", at: 425_000 },
-  { name: "Siskiyou Summit", region: "OR", at: 440_000 },
-  { name: "Hornbrook", region: "CA", at: 460_000 },
-  { name: "Yreka", region: "CA", at: 475_000 },
-  { name: "Weed", region: "CA", at: 500_000 },
-  { name: "Mt. Shasta", region: "CA", at: 510_000 },
-  { name: "Dunsmuir", region: "CA", at: 522_000 },
-  { name: "Lakehead", region: "CA", at: 555_000 },
-  { name: "Shasta Lake", region: "CA", at: 570_000 },
-  { name: "Redding", region: "CA", at: 580_000 },
-  { name: "Anderson", region: "CA", at: 595_000 },
-  { name: "Red Bluff", region: "CA", at: 625_000 },
-  { name: "Corning", region: "CA", at: 655_000 },
-  { name: "Vina", region: "CA", at: 675_000 },
-  { name: "Chico", region: "CA", at: 700_000 },
-  { name: "Oroville", region: "CA", at: 730_000 },
-  { name: "Yuba City", region: "CA", at: 775_000 },
-  { name: "Nicolaus", region: "CA", at: 800_000 },
-  { name: "Sacramento", region: "CA", at: 830_000 },
-  { name: "Davis", region: "CA", at: 855_000 },
-  { name: "Vacaville", region: "CA", at: 895_000 },
-  { name: "Fairfield", region: "CA", at: 915_000 },
-  { name: "Vallejo", region: "CA", at: 945_000 },
-  { name: "Crockett", region: "CA", at: 955_000 },
-  { name: "Richmond", region: "CA", at: 980_000 },
-  { name: "Albany", region: "CA", at: 992_000 },
-  { name: "Berkeley", region: "CA", at: 1_000_000 },
+  { name: "Sherwood", region: "OR", at: 0, x: 252, y: 197 },
+  { name: "Wilsonville", region: "OR", at: 15_000, x: 258, y: 204 },
+  { name: "Woodburn", region: "OR", at: 35_000, x: 251, y: 223 },
+  { name: "Keizer", region: "OR", at: 52_000, x: 236, y: 240 },
+  { name: "Salem", region: "OR", at: 60_000, x: 234, y: 247 },
+  { name: "Albany", region: "OR", at: 100_000, x: 229, y: 284 },
+  { name: "Corvallis", region: "OR", at: 118_000, x: 215, y: 292 },
+  { name: "Junction City", region: "OR", at: 155_000, x: 220, y: 334 },
+  { name: "Eugene", region: "OR", at: 175_000, x: 230, y: 354 },
+  { name: "Cottage Grove", region: "OR", at: 210_000, x: 233, y: 384 },
+  { name: "Drain", region: "OR", at: 240_000, x: 210, y: 401 },
+  { name: "Sutherlin", region: "OR", at: 270_000, x: 210, y: 433 },
+  { name: "Roseburg", region: "OR", at: 285_000, x: 208, y: 454 },
+  { name: "Canyonville", region: "OR", at: 320_000, x: 213, y: 489 },
+  { name: "Glendale", region: "OR", at: 345_000, x: 200, y: 512 },
+  { name: "Grants Pass", region: "OR", at: 370_000, x: 209, y: 547 },
+  { name: "Rogue River", region: "OR", at: 387_000, x: 223, y: 548 },
+  { name: "Medford", region: "OR", at: 405_000, x: 250, y: 560 },
+  { name: "Ashland", region: "OR", at: 425_000, x: 264, y: 577 },
+  { name: "Siskiyou Summit", region: "OR", at: 440_000, x: 274, y: 592 },
+  { name: "Hornbrook", region: "CA", at: 460_000, x: 278, y: 611 },
+  { name: "Yreka", region: "CA", at: 475_000, x: 270, y: 632 },
+  { name: "Weed", region: "CA", at: 500_000, x: 293, y: 669 },
+  { name: "Mt. Shasta", region: "CA", at: 510_000, x: 300, y: 683 },
+  { name: "Dunsmuir", region: "CA", at: 522_000, x: 303, y: 695 },
+  { name: "Lakehead", region: "CA", at: 555_000, x: 293, y: 731 },
+  { name: "Shasta Lake", region: "CA", at: 570_000, x: 294, y: 758 },
+  { name: "Redding", region: "CA", at: 580_000, x: 293, y: 769 },
+  { name: "Anderson", region: "CA", at: 595_000, x: 300, y: 786 },
+  { name: "Red Bluff", region: "CA", at: 625_000, x: 306, y: 819 },
+  { name: "Corning", region: "CA", at: 655_000, x: 311, y: 849 },
+  { name: "Vina", region: "CA", at: 675_000, x: 323, y: 848 },
+  { name: "Chico", region: "CA", at: 700_000, x: 341, y: 872 },
+  { name: "Oroville", region: "CA", at: 730_000, x: 367, y: 898 },
+  { name: "Yuba City", region: "CA", at: 775_000, x: 361, y: 943 },
+  { name: "Nicolaus", region: "CA", at: 800_000, x: 365, y: 972 },
+  { name: "Sacramento", region: "CA", at: 830_000, x: 373, y: 1010 },
+  { name: "Davis", region: "CA", at: 855_000, x: 350, y: 1015 },
+  { name: "Vacaville", region: "CA", at: 895_000, x: 328, y: 1037 },
+  { name: "Fairfield", region: "CA", at: 915_000, x: 323, y: 1050 },
+  { name: "Vallejo", region: "CA", at: 945_000, x: 304, y: 1066 },
+  { name: "Crockett", region: "CA", at: 955_000, x: 318, y: 1079 },
+  { name: "Richmond", region: "CA", at: 980_000, x: 311, y: 1086 },
+  { name: "Albany", region: "CA", at: 992_000, x: 312, y: 1090 },
+  { name: "Berkeley", region: "CA", at: 1_000_000, x: 313, y: 1094 },
 ];
 
 function useRowingData() {
@@ -195,6 +196,18 @@ function useRowingData() {
   const met = yourPosition >= tannerPosition;
   const gap = Math.max(0, tannerPosition - yourPosition);
 
+  // Projected meeting point: split the remaining gap by each rower's share of
+  // the distance so far (falls back to the midpoint before anyone has rowed).
+  const meeting = React.useMemo(() => {
+    const share = totals.combined > 0 ? totals.you / totals.combined : 0.5;
+    const at = met ? yourPosition : yourPosition + share * gap;
+    let near = WAYPOINTS[0];
+    for (const w of WAYPOINTS) {
+      if (Math.abs(w.at - at) < Math.abs(near.at - at)) near = w;
+    }
+    return { at, near };
+  }, [totals.you, totals.combined, yourPosition, gap, met]);
+
   const milestoneStatus = React.useMemo(() => {
     return MILESTONES.map((m) => ({
       ...m,
@@ -241,6 +254,7 @@ function useRowingData() {
     tannerPosition,
     met,
     gap,
+    meeting,
     yourLandmark,
     tannerLandmark,
     totalMeters: TOTAL_METERS,

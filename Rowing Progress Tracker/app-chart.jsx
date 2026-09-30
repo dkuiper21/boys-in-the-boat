@@ -188,19 +188,67 @@ const LON_LINES = [
   { x: 327, label: "122°" }, { x: 416, label: "121°" }, { x: 505, label: "120°" },
 ];
 
-// Boat position — lerp along route segments by real-distance fraction.
-function boatPositionAt(metersFromStart) {
+// --- Route --------------------------------------------------------------------
+// The route follows every waypoint along Interstate 5 (x/y live in data.jsx),
+// so the boats move at an even on-screen pace and the line follows the valleys.
+const ROUTE = WAYPOINTS.map((w) => ({ at: w.at, x: w.x, y: w.y }));
+
+// Chart units per kilometre, from the projection (120 units per degree of
+// latitude, 111.2 km per degree).
+const UNITS_PER_KM = 120 / 111.2;
+
+// Position on the route at a distance from Sherwood, plus the heading
+// (degrees, pointing toward Berkeley) of the leg it sits on.
+function routePositionAt(metersFromStart) {
   const m = Math.max(0, Math.min(metersFromStart, TOTAL_METERS));
-  for (let i = 0; i < MILESTONES.length - 1; i++) {
-    const m1 = MILESTONES[i], m2 = MILESTONES[i + 1];
-    if (m <= m2.at) {
-      const frac = m1.at === m2.at ? 0 : (m - m1.at) / (m2.at - m1.at);
-      const a = CITY_XY[m1.name], b = CITY_XY[m2.name];
-      return { x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac, segment: i, frac };
+  for (let i = 0; i < ROUTE.length - 1; i++) {
+    const a = ROUTE[i], b = ROUTE[i + 1];
+    if (m <= b.at) {
+      const frac = a.at === b.at ? 0 : (m - a.at) / (b.at - a.at);
+      return {
+        x: a.x + (b.x - a.x) * frac,
+        y: a.y + (b.y - a.y) * frac,
+        heading: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI,
+      };
     }
   }
-  const last = CITY_XY[MILESTONES[MILESTONES.length - 1].name];
-  return { x: last.x, y: last.y, segment: MILESTONES.length - 2, frac: 1 };
+  const a = ROUTE[ROUTE.length - 2], b = ROUTE[ROUTE.length - 1];
+  return { x: b.x, y: b.y, heading: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI };
+}
+
+// SVG path along the route between two distances (m0 < m1).
+function routePath(m0, m1) {
+  const pts = [routePositionAt(m0)];
+  for (const p of ROUTE) if (p.at > m0 && p.at < m1) pts.push(p);
+  pts.push(routePositionAt(m1));
+  return "M " + pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ");
+}
+
+// Bounding box of the route between two distances.
+function routeBounds(m0, m1) {
+  const pts = [routePositionAt(m0), routePositionAt(m1)];
+  for (const p of ROUTE) if (p.at > m0 && p.at < m1) pts.push(p);
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+}
+
+// Cumulative position after each of one rower's sessions, oldest first.
+function sessionMarks(sessions, person, start, direction) {
+  const out = [];
+  let total = 0;
+  for (const s of sessions) {
+    if (s.person !== person) continue;
+    total += s.meters;
+    const at = start + direction * total;
+    if (at < 0 || at > TOTAL_METERS) break;
+    out.push({ id: s.id, at, date: s.date, meters: s.meters });
+  }
+  return out;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtMonthYear(d) {
+  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 // --- Chart frame (degree-banded border, like a real chart) -------------------
@@ -245,31 +293,106 @@ function ChartFrame() {
 
 // --- Chart ---------------------------------------------------------------
 
-function Chart({ data }) {
-  const [hovered, setHovered] = React.useState(null);
-  const youBoat = boatPositionAt(data.yourPosition);
-  const tannerBoat = boatPositionAt(data.tannerPosition);
+// A rowing shell seen from above, bow along +x, rotated to its heading.
+function Shell({ x, y, heading, color }) {
+  const ink = CHART_PALETTE.ink;
+  return (
+    <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${heading.toFixed(1)})`}>
+      <path d="M -9,-3 L -3,-15 M -9,3 L -3,15 M 1,-3 L 7,-15 M 1,3 L 7,15"
+        stroke={ink} strokeWidth="1.1" strokeLinecap="round" fill="none" />
+      <path d="M -4.6,-15.6 L -1.4,-14.4 L -2,-17 Z M -4.6,15.6 L -1.4,14.4 L -2,17 Z M 5.4,-15.6 L 8.6,-14.4 L 8,-17 Z M 5.4,15.6 L 8.6,14.4 L 8,17 Z"
+        fill={ink} />
+      <path d="M -22,0 Q -12,-4.2 6,-3.6 Q 18,-2.2 25,0 Q 18,2.2 6,3.6 Q -12,4.2 -22,0 Z"
+        fill={color} stroke={ink} strokeWidth="1.2" />
+      <line x1="-14" y1="0" x2="16" y2="0" stroke={CHART_PALETTE.paper} strokeWidth="0.8" opacity="0.7" />
+    </g>
+  );
+}
 
-  const youWake = React.useMemo(() => {
-    const pts = [];
-    for (let i = 1; i < 9; i++) pts.push(boatPositionAt(data.yourPosition - i * 9000));
-    return pts;
-  }, [data.yourPosition]);
-  const tannerWake = React.useMemo(() => {
-    const pts = [];
-    for (let i = 1; i < 9; i++) pts.push(boatPositionAt(data.tannerPosition + i * 9000));
-    return pts;
-  }, [data.tannerPosition]);
+// V-shaped wake marks trailing behind a boat. `direction` is +1 when the boat
+// moves toward Berkeley (Daniel) and -1 toward Sherwood (Tanner).
+function Wake({ at, direction }) {
+  const marks = [];
+  for (let i = 1; i <= 5; i++) {
+    const m = at - direction * i * 6500;
+    if (m < 0 || m > TOTAL_METERS) break;
+    const p = routePositionAt(m);
+    const a = (p.heading + (direction < 0 ? 180 : 0)) * Math.PI / 180;
+    const w = 3 + i * 1.6;
+    const nx = -Math.sin(a), ny = Math.cos(a);
+    const bx = -Math.cos(a) * 4, by = -Math.sin(a) * 4;
+    marks.push(
+      <path key={i}
+        d={`M ${(p.x + nx * w + bx).toFixed(1)},${(p.y + ny * w + by).toFixed(1)} L ${p.x.toFixed(1)},${p.y.toFixed(1)} L ${(p.x - nx * w + bx).toFixed(1)},${(p.y - ny * w + by).toFixed(1)}`}
+        fill="none" stroke={CHART_PALETTE.ink} strokeWidth="0.8" strokeLinecap="round"
+        opacity={(0.75 - i * 0.12).toFixed(2)} />
+    );
+  }
+  return <g pointerEvents="none">{marks}</g>;
+}
+
+// A paper name tag to the left of a boat, joined by a leader line.
+// `dy` shifts the tag up or down (used when the two boats are close together).
+function BoatTag({ x, y, name, detail, color, dy = 0 }) {
+  const w = 96, h = 30;
+  const bx = x - w - 18, by = y + dy - h / 2;
+  return (
+    <g pointerEvents="none">
+      <line x1={x} y1={y} x2={bx + w} y2={y + dy} stroke={CHART_PALETTE.ink} strokeWidth="0.6" />
+      <rect x={bx} y={by} width={w} height={h} fill={CHART_PALETTE.paper} stroke={CHART_PALETTE.ink} strokeWidth="0.8" />
+      <rect x={bx} y={by} width="4" height={h} fill={color} />
+      <text x={bx + 10} y={by + 13} fontFamily="Spectral, serif" fontWeight="600" fontSize="11" fill={CHART_PALETTE.ink}>{name}</text>
+      <text x={bx + 10} y={by + 24} fontFamily="JetBrains Mono, monospace" fontSize="7.5" letterSpacing=".04em" fill={CHART_PALETTE.inkSoft}>{detail}</text>
+    </g>
+  );
+}
+
+// `view` (optional) zooms the chart to a region: { x, y, w, h } in chart units.
+// Extra props (ref, pointer handlers, style) pass through to the <svg>.
+const Chart = React.forwardRef(function Chart({ data, view, style, ...svgProps }, ref) {
+  const [hovered, setHovered] = React.useState(null);
+  const [tick, setTick] = React.useState(null);
+  const youBoat = routePositionAt(data.yourPosition);
+  const tannerBoat = routePositionAt(data.tannerPosition);
+  const P = CHART_PALETTE;
+
+  const youMarks = React.useMemo(
+    () => sessionMarks(data.sessions, "you", 0, 1),
+    [data.sessions]
+  );
+  const tannerMarks = React.useMemo(
+    () => sessionMarks(data.sessions, "tanner", TOTAL_METERS, -1),
+    [data.sessions]
+  );
+
+  const meetPoint = routePositionAt(data.meeting.at);
+  const gapBounds = routeBounds(data.yourPosition, data.tannerPosition);
+  // Bracket for the gap sits east of the route and its city labels.
+  const bracketX = Math.min(470, gapBounds.x1 + 95);
+  const gapMidY = (gapBounds.y0 + gapBounds.y1) / 2;
+
+  // Keep the two name tags from stacking on top of each other: when the boats
+  // are close, Tanner's tag moves just below Daniel's.
+  const tagClash = Math.abs(tannerBoat.y - youBoat.y) < 34;
+
+  // Skip the meeting label when a boat's name tag would sit on top of it.
+  const meetLabelClear = data.met ||
+    (Math.abs(meetPoint.y - youBoat.y) > 36 && Math.abs(meetPoint.y - tannerBoat.y) > 36);
+
+  const toggle = (name) => setHovered((h) => (h === name ? null : name));
 
   return (
     <svg
-      viewBox="0 0 600 1200"
-      preserveAspectRatio="xMidYMid meet"
-      style={{
+      ref={ref}
+      viewBox={view ? `${view.x} ${view.y} ${view.w} ${view.h}` : "0 0 600 1200"}
+      preserveAspectRatio={view ? "xMidYMid slice" : "xMidYMid meet"}
+      style={style || {
         height: "100%", width: "auto", maxWidth: "100%",
         display: "block",
         boxShadow: "0 6px 18px rgba(20,15,5,0.25), 0 1px 0 rgba(255,255,255,0.4) inset",
       }}
+      onClick={() => { setTick(null); setHovered(null); }}
+      {...svgProps}
     >
       <defs>
         <pattern id="chart-paper" width="6" height="6" patternUnits="userSpaceOnUse">
@@ -423,45 +546,53 @@ function Chart({ data }) {
           <text x="0" y="-50" textAnchor="middle" fontFamily="Spectral, serif" fontSize="11" fontStyle="italic" fill={CHART_PALETTE.paper}>N</text>
         </g>
 
-        {/* planned course — straight rhumb legs through the milestone cities */}
+        {/* planned course — the full route, quiet */}
         <path
-          d={MILESTONES.map((m, i) => {
-            const p = CITY_XY[m.name];
-            return `${i === 0 ? "M" : "L"} ${p.x},${p.y}`;
-          }).join(" ")}
-          fill="none" stroke={CHART_PALETTE.ink} strokeWidth="1.3" strokeDasharray="4 4" opacity="0.6"
+          d={routePath(0, TOTAL_METERS)}
+          fill="none" stroke={P.ink} strokeWidth="0.9" strokeDasharray="3 3"
+          strokeLinejoin="round" opacity="0.45"
         />
 
-        {/* traveled — painted from both ends */}
-        <g>
-          {MILESTONES.slice(0, -1).map((m, i) => {
-            const next = MILESTONES[i + 1];
-            const a = CITY_XY[m.name], b = CITY_XY[next.name];
-            const segLen = next.at - m.at;
-            const lerp = (frac) => ({ x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac });
-            const yourEnd = Math.min(data.yourPosition, next.at);
-            const yourStarts = data.yourPosition > m.at;
-            const tannerStart = Math.max(data.tannerPosition, m.at);
-            const tannerStarts = data.tannerPosition < next.at;
-            const yourFrac = yourStarts ? (yourEnd - m.at) / segLen : 0;
-            const tannerFrac = tannerStarts ? (tannerStart - m.at) / segLen : 1;
-            const yp = lerp(yourFrac), tp = lerp(tannerFrac);
-            return (
-              <g key={i}>
-                {yourStarts && <line x1={a.x} y1={a.y} x2={yp.x} y2={yp.y} stroke={CHART_PALETTE.redInk} strokeWidth="2.4" strokeLinecap="round" />}
-                {tannerStarts && <line x1={tp.x} y1={tp.y} x2={b.x} y2={b.y} stroke={CHART_PALETTE.brass} strokeWidth="2.4" strokeLinecap="round" />}
-              </g>
-            );
-          })}
-        </g>
+        {/* still to row — highlighted dashed stretch between the boats */}
+        {!data.met && (
+          <g pointerEvents="none">
+            <path d={routePath(data.yourPosition, data.tannerPosition)} fill="none"
+              stroke={P.brassLight} strokeWidth="7" opacity="0.28"
+              strokeLinecap="round" strokeLinejoin="round" />
+            <path d={routePath(data.yourPosition, data.tannerPosition)} fill="none"
+              stroke={P.ink} strokeWidth="1.4" strokeDasharray="1.5 3.5"
+              strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        )}
 
-        {/* wakes */}
-        {youWake.map((p, i) => (
-          <circle key={`yw${i}`} cx={p.x} cy={p.y} r={2.2 - i * 0.18} fill={CHART_PALETTE.paper} opacity={0.55 - i * 0.05} />
+        {/* tracks — each rower's colour with an ink casing */}
+        {[
+          { key: "you", from: 0, to: data.yourPosition, color: P.redInk },
+          { key: "tanner", from: data.tannerPosition, to: TOTAL_METERS, color: P.brass },
+        ].filter((t) => t.to > t.from).map((t) => (
+          <g key={t.key} pointerEvents="none">
+            <path d={routePath(t.from, t.to)} fill="none" stroke={P.ink} strokeWidth="5.6"
+              strokeLinecap="round" strokeLinejoin="round" />
+            <path d={routePath(t.from, t.to)} fill="none" stroke={t.color} strokeWidth="3.4"
+              strokeLinecap="round" strokeLinejoin="round" />
+          </g>
         ))}
-        {tannerWake.map((p, i) => (
-          <circle key={`tw${i}`} cx={p.x} cy={p.y} r={2.2 - i * 0.18} fill={CHART_PALETTE.paper} opacity={0.55 - i * 0.05} />
-        ))}
+
+        {/* session ticks — one across the track per logged row */}
+        {[...youMarks, ...tannerMarks].map((mk) => {
+          const p = routePositionAt(mk.at);
+          const a = p.heading * Math.PI / 180;
+          const nx = -Math.sin(a) * 4.2, ny = Math.cos(a) * 4.2;
+          const show = (e) => { e.stopPropagation(); setTick(mk); };
+          return (
+            <g key={mk.id} onClick={show} onMouseEnter={show} onMouseLeave={() => setTick(null)} style={{ cursor: "pointer" }}>
+              <line x1={p.x + nx * 1.6} y1={p.y + ny * 1.6} x2={p.x - nx * 1.6} y2={p.y - ny * 1.6}
+                stroke="transparent" strokeWidth="5" />
+              <line x1={p.x + nx} y1={p.y + ny} x2={p.x - nx} y2={p.y - ny}
+                stroke={P.ink} strokeWidth="0.9" strokeLinecap="round" />
+            </g>
+          );
+        })}
 
         {/* context cities */}
         <g fontFamily="Spectral, serif" fill={CHART_PALETTE.inkSoft}>
@@ -495,6 +626,7 @@ function Chart({ data }) {
               transform={`translate(${p.x},${p.y})`}
               onMouseEnter={() => setHovered(m.name)}
               onMouseLeave={() => setHovered(null)}
+              onClick={(e) => { e.stopPropagation(); toggle(m.name); }}
               style={{ cursor: "pointer" }}
             >
               <circle r="14" fill="transparent" />
@@ -546,20 +678,88 @@ function Chart({ data }) {
           );
         })}
 
-        {/* boats */}
-        <g transform={`translate(${youBoat.x},${youBoat.y})`}>
-          <ellipse cx="0" cy="6" rx="14" ry="3" fill={CHART_PALETTE.paper} opacity="0.55" />
-          <path d="M-11,0 Q0,7 11,0 L8,3 Q0,5 -8,3 Z" fill={CHART_PALETTE.ink} />
-          <line x1="0" y1="0" x2="0" y2="-12" stroke={CHART_PALETTE.ink} strokeWidth="1" />
-          <path d="M0,-12 L9,-9 L0,-7 Z" fill={CHART_PALETTE.redInk} />
-          <text x="12" y="-7" fontFamily="Spectral, serif" fontStyle="italic" fontSize="9" fill={CHART_PALETTE.ink}>Daniel</text>
+        {/* projected meeting point */}
+        <g pointerEvents="none">
+          <g transform={`translate(${meetPoint.x.toFixed(1)},${meetPoint.y.toFixed(1)})`}>
+            <circle r="9" fill={P.paper} stroke={P.ink} strokeWidth="1.1" strokeDasharray={data.met ? "none" : "2 2"} />
+            <path d="M0,-5.5 L0,5 M-4,2 Q0,6.5 4,2 M-2.5,-3 L2.5,-3" fill="none" stroke={P.ink} strokeWidth="1.2" strokeLinecap="round" />
+            <circle cx="0" cy="-6.5" r="1.4" fill="none" stroke={P.ink} strokeWidth="1" />
+          </g>
+          {meetLabelClear && <>
+          <text x={meetPoint.x - 14} y={meetPoint.y - 2} textAnchor="end" fontFamily="Spectral, serif"
+            fontSize="10" fontWeight="600" fontStyle="italic" fill={P.ink}>
+            {data.met ? "Met here" : "Projected meeting"}
+          </text>
+          <text x={meetPoint.x - 14} y={meetPoint.y + 9} textAnchor="end" fontFamily="JetBrains Mono, monospace"
+            fontSize="7.5" fill={P.inkSoft}>
+            {`NEAR ${data.meeting.near.name.toUpperCase()}`}
+            {!data.met && data.eta ? ` · ${fmtMonthYear(data.eta.arrival).toUpperCase()}` : ""}
+          </text>
+          </>}
         </g>
-        <g transform={`translate(${tannerBoat.x},${tannerBoat.y})`}>
-          <ellipse cx="0" cy="6" rx="14" ry="3" fill={CHART_PALETTE.paper} opacity="0.55" />
-          <path d="M-11,0 Q0,7 11,0 L8,3 Q0,5 -8,3 Z" fill={CHART_PALETTE.ink} />
-          <line x1="0" y1="0" x2="0" y2="-12" stroke={CHART_PALETTE.ink} strokeWidth="1" />
-          <path d="M0,-12 L-9,-9 L0,-7 Z" fill={CHART_PALETTE.brass} />
-          <text x="-12" y="-7" textAnchor="end" fontFamily="Spectral, serif" fontStyle="italic" fontSize="9" fill={CHART_PALETTE.ink}>Tanner</text>
+
+        {/* gap bracket + distance still to row */}
+        {!data.met && (
+          <g pointerEvents="none">
+            {gapBounds.y1 - gapBounds.y0 > 24 && (
+              <path d={`M ${bracketX - 6},${gapBounds.y0} L ${bracketX},${gapBounds.y0} L ${bracketX},${gapBounds.y1} L ${bracketX - 6},${gapBounds.y1}`}
+                fill="none" stroke={P.ink} strokeWidth="0.9" />
+            )}
+            <rect x={bracketX + 6} y={gapMidY - 14} width="84" height="28" fill={P.paper} stroke={P.ink} strokeWidth="0.8" />
+            <text x={bracketX + 48} y={gapMidY - 1} textAnchor="middle" fontFamily="Spectral, serif"
+              fontSize="13" fontWeight="600" fill={P.ink}>{(data.gap / 1000).toFixed(1)} km</text>
+            <text x={bracketX + 48} y={gapMidY + 9} textAnchor="middle" fontFamily="JetBrains Mono, monospace"
+              fontSize="6.5" letterSpacing=".12em" fill={P.inkSoft}>STILL TO ROW</text>
+          </g>
+        )}
+
+        {/* boats — shells pointed along the route, with wakes and name tags */}
+        <Wake at={data.yourPosition} direction={1} />
+        <Wake at={data.tannerPosition} direction={-1} />
+        <Shell x={youBoat.x} y={youBoat.y} heading={youBoat.heading} color={P.redInk} />
+        <Shell x={tannerBoat.x} y={tannerBoat.y} heading={tannerBoat.heading + 180} color={P.brass} />
+        <BoatTag x={youBoat.x} y={youBoat.y} name="Daniel"
+          detail={`${(data.totals.you / 1000).toFixed(1)} KM · S↓`} color={P.redInk} />
+        <BoatTag x={tannerBoat.x} y={tannerBoat.y} name="Tanner"
+          detail={`${(data.totals.tanner / 1000).toFixed(1)} KM · N↑`} color={P.brass}
+          dy={tagClash ? (youBoat.y + 36 - tannerBoat.y) : 0} />
+
+        {/* session detail — shown when a tick is tapped or hovered */}
+        {tick && (() => {
+          const p = routePositionAt(tick.at);
+          const d = new Date(tick.date + "T12:00:00");
+          const label = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+          return (
+            <g transform={`translate(${(p.x + 14).toFixed(1)},${(p.y - 12).toFixed(1)})`} pointerEvents="none">
+              <rect x="0" y="-11" width="112" height="24" fill={P.paper} stroke={P.ink} strokeWidth="0.6" />
+              <text x="6" y="-1" fontFamily="JetBrains Mono, monospace" fontSize="7.5" fill={P.inkSoft} letterSpacing=".04em">{label.toUpperCase()}</text>
+              <text x="6" y="9" fontFamily="Spectral, serif" fontStyle="italic" fontSize="9.5" fill={P.ink}>
+                {tick.meters.toLocaleString()} m rowed
+              </text>
+            </g>
+          );
+        })()}
+
+        {/* key */}
+        <g transform="translate(36,1010)" pointerEvents="none">
+          <rect width="150" height="104" fill={P.paper} stroke={P.ink} strokeWidth="0.8" />
+          <text x="10" y="16" fontFamily="JetBrains Mono, monospace" fontSize="7" letterSpacing=".2em" fill={P.inkSoft}>KEY</text>
+          <g fontFamily="Spectral, serif" fontStyle="italic" fontSize="9.5" fill={P.ink}>
+            <line x1="10" y1="30" x2="38" y2="30" stroke={P.ink} strokeWidth="5.6" strokeLinecap="round" />
+            <line x1="10" y1="30" x2="38" y2="30" stroke={P.redInk} strokeWidth="3.4" strokeLinecap="round" />
+            <text x="46" y="33">Daniel’s track</text>
+            <line x1="10" y1="46" x2="38" y2="46" stroke={P.ink} strokeWidth="5.6" strokeLinecap="round" />
+            <line x1="10" y1="46" x2="38" y2="46" stroke={P.brass} strokeWidth="3.4" strokeLinecap="round" />
+            <text x="46" y="49">Tanner’s track</text>
+            <line x1="10" y1="62" x2="38" y2="62" stroke={P.ink} strokeWidth="0.8" opacity="0.5" />
+            <line x1="24" y1="57" x2="24" y2="67" stroke={P.ink} strokeWidth="0.9" />
+            <text x="46" y="65">One logged session</text>
+            <line x1="10" y1="78" x2="38" y2="78" stroke={P.brassLight} strokeWidth="7" opacity="0.35" strokeLinecap="round" />
+            <line x1="10" y1="78" x2="38" y2="78" stroke={P.ink} strokeWidth="1.4" strokeDasharray="1.5 3.5" strokeLinecap="round" />
+            <text x="46" y="81">Still to row</text>
+            <circle cx="24" cy="93" r="5" fill={P.paper} stroke={P.ink} strokeWidth="0.9" strokeDasharray="2 2" />
+            <text x="46" y="96">Projected meeting</text>
+          </g>
         </g>
 
         {/* cartouche */}
@@ -576,18 +776,19 @@ function Chart({ data }) {
             <ellipse cx="18" cy="12.7" rx="3.4" ry="1.7" fill={CHART_PALETTE.ink} transform="rotate(20 18 12.7)" />
           </g>
           <text x="0" y="28" textAnchor="middle" fontFamily="Spectral, serif" fontSize="8.5" fontStyle="italic" fill={CHART_PALETTE.inkSoft}>Sherwood to Berkeley</text>
-          <text x="0" y="40" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="7.5" fill={CHART_PALETTE.ink} letterSpacing=".18em">1,000 KM · MMXXVI</text>
+          <text x="0" y="40" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="7.5" fill={CHART_PALETTE.ink} letterSpacing=".18em">1,000 KM · BEGUN MMXXV</text>
         </g>
 
-        {/* scale bar */}
+        {/* scale bar — 200 km at the chart's real scale */}
         <g transform="translate(50,1148)">
-          <line x1="0" y1="0" x2="160" y2="0" stroke={CHART_PALETTE.paper} strokeWidth="1.2" />
-          {[0, 40, 80, 120, 160].map((x) => (
-            <line key={x} x1={x} y1={x % 80 === 0 ? -4 : -3} x2={x} y2={x % 80 === 0 ? 4 : 3} stroke={CHART_PALETTE.paper} strokeWidth={x % 80 === 0 ? 1.2 : 0.8} />
+          <line x1="0" y1="0" x2={200 * UNITS_PER_KM} y2="0" stroke={P.paper} strokeWidth="1.2" />
+          {[0, 50, 100, 150, 200].map((km) => (
+            <line key={km} x1={km * UNITS_PER_KM} y1={km % 100 === 0 ? -4 : -3} x2={km * UNITS_PER_KM} y2={km % 100 === 0 ? 4 : 3}
+              stroke={P.paper} strokeWidth={km % 100 === 0 ? 1.2 : 0.8} />
           ))}
-          <text x="0" y="15" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={CHART_PALETTE.paper}>0</text>
-          <text x="80" y="15" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={CHART_PALETTE.paper}>250</text>
-          <text x="160" y="15" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={CHART_PALETTE.paper}>500 km</text>
+          {[[0, "0"], [100, "100"], [200, "200 km"]].map(([km, label]) => (
+            <text key={km} x={km * UNITS_PER_KM} y="15" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="8" fill={P.paper}>{label}</text>
+          ))}
         </g>
 
         {/* vignette */}
@@ -601,6 +802,6 @@ function Chart({ data }) {
       <rect width="600" height="1200" filter="url(#chart-grain)" opacity="0.5" pointerEvents="none" />
     </svg>
   );
-}
+});
 
-Object.assign(window, { Chart, CHART_PALETTE });
+Object.assign(window, { Chart, CHART_PALETTE, routePositionAt, routeBounds });
