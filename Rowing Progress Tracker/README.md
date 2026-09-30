@@ -16,6 +16,8 @@ north from Berkeley. They meet in the middle of 1,000 km.
 index.html              ← entry point, initializes Firebase
 data.jsx                ← Firestore-backed useRowingData hook
 app-chart.jsx           ← the nautical chart SVG
+terrain.webp            ← shaded-relief background for the chart (land, sea floor, coastline)
+map-data.js             ← generated geography: highway route, lakes, rivers, state line
 app-log.jsx             ← the logbook (header stats, entries, form)
 app-main.jsx            ← layout, identity picker, loading + error states
 (boys-in-the-boat / a rowing tracker)
@@ -65,6 +67,23 @@ service cloud.firestore {
 This still lets anyone with the URL read/write the `sessions` collection —
 fine for an unlisted Vercel URL with two trusted users. If you want real auth
 (Google sign-in, etc.) that's a follow-on change.
+
+## Map data
+
+The chart uses a plate carrée projection: `x = 60 + (lon + 125) * 89`,
+`y = (47 - lat) * 120`, on a 600 × 1200 frame (37°N–47°N).
+
+- **Terrain** (`terrain.webp`, 1200 × 2400): hillshade and elevation tint from
+  [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (zoom 8),
+  which combine SRTM, GMTED2010 and ETOPO1 among other sources; coastline from
+  Natural Earth 1:10m land polygons.
+- **Vectors** (`map-data.js`): lakes, rivers, the Oregon–California line and the
+  highway network from [Natural Earth](https://www.naturalearthdata.com/)
+  (public domain). The route follows Interstate 5, Highway 99 and Interstate 80
+  through the waypoint towns in `data.jsx`; each vertex stores its distance
+  from Sherwood.
+
+Both files are generated; regenerate them rather than editing by hand.
 
 ## Data model
 

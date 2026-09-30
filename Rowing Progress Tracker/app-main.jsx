@@ -484,7 +484,7 @@ function NauticalApp() {
             letterSpacing: ".18em", color: "rgba(27,43,58,0.5)",
             textAlign: "center", lineHeight: 1.6,
           }}>
-            SOUNDINGS<br />IN<br />FATHOMS
+            HEIGHTS<br />IN<br />FEET
           </div>
         </div>
       </div>
