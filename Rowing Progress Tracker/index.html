@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>Boys in the Boat · Sherwood → Berkeley</title>
 
+  <link rel="preload" as="image" href="terrain.webp" type="image/webp" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -71,6 +72,8 @@
 <body>
   <div id="root"></div>
 
+  <!-- Generated geography for the chart (route, lakes, rivers); plain JS, no Babel needed -->
+  <script src="map-data.js"></script>
   <script type="text/babel" src="data.jsx"></script>
   <script type="text/babel" src="app-chart.jsx"></script>
   <script type="text/babel" src="app-log.jsx"></script>
