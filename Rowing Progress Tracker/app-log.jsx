@@ -326,7 +326,7 @@ function LogForm({ data }) {
   );
 }
 
-function Logbook({ data, compact }) {
+function Logbook({ data, compact, headerRight }) {
   const sortedDesc = [...data.sessions].sort((a, b) => b.date.localeCompare(a.date));
 
   if (compact) {
@@ -384,13 +384,13 @@ function Logbook({ data, compact }) {
       }}>
         {/* Top brand strip */}
         <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
           fontFamily: "JetBrains Mono, monospace", fontSize: 9,
           letterSpacing: ".22em", textTransform: "uppercase",
           color: CHART_PALETTE.inkSoft,
         }}>
           <span>Captain's Log</span>
-          <span>Vol. I · MMXXVI</span>
+          {headerRight || <span>Vol. I · MMXXVI</span>}
         </div>
         <ProgressMeter data={data} />
         <CurrentBearing data={data} />
