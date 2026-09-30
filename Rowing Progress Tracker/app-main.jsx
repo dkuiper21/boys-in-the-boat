@@ -139,40 +139,51 @@ function useIsMobile() {
   return mobile;
 }
 
-// Phone map: opens zoomed to the stretch between the two boats. Drag to pan,
-// pinch or use the buttons to zoom, "Full route" for the whole chart.
-function ZoomedChart({ data, onShowFull }) {
-  const P = CHART_PALETTE;
+// Phone map: opens zoomed to the stretch between the two boats, centred in
+// the space between the top bar and the summary strip. Drag to pan, pinch or
+// use the zoom buttons (in the strip below the map) to zoom.
+// Zoom and pan live in MobileApp so the controls outside the map can drive them.
+function ZoomedChart({ data, zoom, setZoom, pan, setPan }) {
   const svgRef = React.useRef(null);
-  const [zoom, setZoom] = React.useState(1);
-  const [pan, setPan] = React.useState({ x: 0, y: 0 });
+  const boxRef = React.useRef(null);
+  const [box, setBox] = React.useState(null);
   const gesture = React.useRef({ pointers: new Map(), moved: false, startDist: 0, startZoom: 1 });
 
-  // Base view: the gap between the boats (and the meeting point), padded.
+  // Track the map area's size so the view matches its shape exactly.
+  React.useLayoutEffect(() => {
+    const el = boxRef.current;
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Base view: the gap between the boats, including the boats' name tags
+  // (~125 units to the left) and city labels (~70 to the right), centred.
   const base = React.useMemo(() => {
     const b = routeBounds(
       Math.min(data.yourPosition, data.tannerPosition),
       Math.max(data.yourPosition, data.tannerPosition)
     );
-    // Name tags hang ~125 units left of the boats; city labels run ~70 right.
-    const left = b.x0 - 125, right = b.x1 + 70;
-    const h = Math.max(320, b.y1 - b.y0 + 260, (right - left) / 0.5);
-    // Sit the gap a little above centre so the summary card doesn't cover it.
-    return { cx: (left + right) / 2, cy: (b.y0 + b.y1) / 2 + 50, h };
+    const left = b.x0 - 125, right = b.x1 + 70, top = b.y0 - 60, bottom = b.y1 + 60;
+    return { cx: (left + right) / 2, cy: (top + bottom) / 2, w: right - left, h: Math.max(300, bottom - top) };
   }, [data.yourPosition, data.tannerPosition]);
 
-  const h = Math.min(1200, base.h / zoom);
-  const w = Math.max(280, h * 0.62);
+  const aspect = box && box.h > 0 ? box.w / box.h : 0.6;
+  // Fit the base box to the area's shape, then apply the zoom.
+  let h = Math.max(base.h, base.w / aspect) / zoom;
+  let w = h * aspect;
+  if (w > 600) { w = 600; h = w / aspect; }
+  if (h > 1200) { h = 1200; w = h * aspect; }
   const cx = Math.max(w / 2, Math.min(600 - w / 2, base.cx + pan.x));
   const cy = Math.max(h / 2, Math.min(1200 - h / 2, base.cy + pan.y));
   const view = { x: cx - w / 2, y: cy - h / 2, w, h };
 
-  // Screen pixels per chart unit (the chart covers the box, "slice").
   const pxPerUnit = () => {
     const r = svgRef.current.getBoundingClientRect();
     return Math.max(r.width / view.w, r.height / view.h);
   };
-  const clampZoom = (z) => Math.max(base.h / 1200, Math.min(4, z));
 
   const onPointerDown = (e) => {
     const g = gesture.current;
@@ -215,171 +226,171 @@ function ZoomedChart({ data, onShowFull }) {
     if (gesture.current.moved) { e.stopPropagation(); gesture.current.moved = false; }
   };
 
-  const reset = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
-  const iconBtn = {
-    width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
-    background: P.paper, border: `1px solid ${P.ink}`, color: P.ink, padding: 0, cursor: "pointer",
-  };
-  const textBtn = {
-    height: 44, padding: "0 12px", background: P.paper, color: P.ink,
-    border: `1px solid ${P.ink}`, fontFamily: "JetBrains Mono, monospace", fontSize: 10,
-    letterSpacing: ".16em", textTransform: "uppercase", cursor: "pointer",
-  };
-  const label = {
-    fontFamily: "JetBrains Mono, monospace", fontSize: 9, letterSpacing: ".22em",
-    textTransform: "uppercase", color: P.inkSoft,
-  };
-
   return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-      <Chart
-        ref={svgRef}
-        data={data}
-        view={view}
-        style={{ width: "100%", height: "100%", display: "block", touchAction: "none" }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onClickCapture={onClickCapture}
-      />
-
-      <div style={{ position: "absolute", top: 12, left: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-        <button type="button" aria-label="Zoom in" style={iconBtn} onClick={() => setZoom((z) => clampZoom(z * 1.5))}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={P.ink} strokeWidth="1.6" strokeLinecap="round"><path d="M8 2v12M2 8h12" /></svg>
-        </button>
-        <button type="button" aria-label="Zoom out" style={iconBtn} onClick={() => setZoom((z) => clampZoom(z / 1.5))}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={P.ink} strokeWidth="1.6" strokeLinecap="round"><path d="M2 8h12" /></svg>
-        </button>
-      </div>
-
-      <div style={{ position: "absolute", top: 62, right: 12, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-        <button type="button" style={textBtn} onClick={onShowFull}>Full route</button>
-        {(zoom !== 1 || pan.x !== 0 || pan.y !== 0) && (
-          <button type="button" style={textBtn} onClick={reset}>Recenter</button>
-        )}
-      </div>
-
-      {!data.met && (
-        <div style={{
-          position: "absolute", left: 12, right: 12, bottom: 12,
-          background: P.paper, border: `1px solid ${P.ink}`,
-          boxShadow: "0 6px 16px rgba(20,15,5,0.2)",
-          padding: "12px 16px", display: "flex", alignItems: "center", gap: 14,
-          pointerEvents: "none",
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={label}>Still to row</div>
-            <div style={{ fontFamily: "Spectral, serif", fontSize: 26, fontWeight: 600, lineHeight: 1.05, color: P.ink }}>
-              {(data.gap / 1000).toFixed(1)} km
-            </div>
-          </div>
-          <div style={{ width: 1, alignSelf: "stretch", background: P.ink, opacity: 0.3 }} />
-          <div style={{ flex: 1 }}>
-            <div style={label}>Projected meeting</div>
-            <div style={{ fontFamily: "Spectral, serif", fontSize: 15, fontStyle: "italic", lineHeight: 1.25, color: P.ink }}>
-              near {data.meeting.near.name}
-              {data.eta && <><br />{data.eta.arrival.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</>}
-            </div>
-          </div>
-        </div>
+    <div ref={boxRef} style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      {box && (
+        <Chart
+          ref={svgRef}
+          data={data}
+          view={view}
+          style={{ width: "100%", height: "100%", display: "block", touchAction: "none" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onClickCapture={onClickCapture}
+        />
       )}
     </div>
   );
 }
 
-function MobileApp({ data }) {
-  const [tab, setTab] = React.useState("chart");
-  const [mapMode, setMapMode] = React.useState("gap");
-  const isYou = data.identity === "you";
-  const identityColor = isYou ? CHART_PALETTE.redInk : CHART_PALETTE.brass;
+const clampZoom = (z) => Math.max(0.35, Math.min(4, z));
 
+// Shared styles for the phone bars around the map.
+const BAR_MONO = {
+  fontFamily: "JetBrains Mono, monospace", fontSize: 10,
+  letterSpacing: ".16em", textTransform: "uppercase",
+};
+
+function IdentityChip({ data, compact }) {
+  const isYou = data.identity === "you";
   const switchIdentity = () => {
     if (confirm("Switch user on this device?")) data.setIdentity(null);
   };
+  return (
+    <button
+      type="button"
+      onClick={switchIdentity}
+      aria-label={`Logged in as ${isYou ? "Daniel" : "Tanner"}. Switch user`}
+      style={{
+        ...BAR_MONO, fontSize: compact ? 9 : 10, letterSpacing: ".18em",
+        height: compact ? 28 : 40, padding: "0 12px",
+        background: CHART_PALETTE.paper, color: CHART_PALETTE.ink,
+        border: `1px solid ${CHART_PALETTE.ink}`, cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+      }}
+    >
+      <span style={{ width: 8, height: 8, display: "inline-block", background: isYou ? CHART_PALETTE.redInk : CHART_PALETTE.brass }} />
+      {isYou ? "Daniel" : "Tanner"}
+      <span style={{ opacity: 0.5 }}>switch</span>
+    </button>
+  );
+}
+
+function MobileApp({ data }) {
+  const P = CHART_PALETTE;
+  const [tab, setTab] = React.useState("chart");
+  const [mapMode, setMapMode] = React.useState("gap");
+  const [zoom, setZoom] = React.useState(1);
+  const [pan, setPan] = React.useState({ x: 0, y: 0 });
+  const moved = zoom !== 1 || pan.x !== 0 || pan.y !== 0;
+
+  const showBoats = () => { setMapMode("gap"); setZoom(1); setPan({ x: 0, y: 0 }); };
+
+  const segBtn = (active) => ({
+    ...BAR_MONO, height: 40, padding: "0 12px", cursor: "pointer",
+    background: active ? P.ink : "transparent", color: active ? P.paper : P.ink,
+    border: 0,
+  });
+  const iconBtn = {
+    width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
+    background: P.paper, border: `1px solid ${P.ink}`, color: P.ink, padding: 0, cursor: "pointer", flexShrink: 0,
+  };
+  const label = { ...BAR_MONO, fontSize: 9, letterSpacing: ".22em", color: P.inkSoft };
+  const eta = data.eta ? data.eta.arrival.toLocaleDateString(undefined, { month: "short", year: "numeric" }) : null;
 
   return (
     <div className="app-fill" style={{
       display: "flex", flexDirection: "column",
-      background: CHART_PALETTE.paperDeep, overflow: "hidden",
+      background: P.paperDeep, overflow: "hidden",
     }}>
-      <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
-        {tab === "chart" && mapMode === "gap" && (
-          <div style={{ position: "absolute", inset: 0, background: CHART_PALETTE.paper }}>
-            <ZoomedChart data={data} onShowFull={() => setMapMode("full")} />
-            <button
-              onClick={switchIdentity}
-              style={{
-                position: "absolute", top: 12, right: 12,
-                background: CHART_PALETTE.paper,
-                border: `1px solid ${CHART_PALETTE.ink}`,
-                color: CHART_PALETTE.ink,
-                height: 44, padding: "0 12px",
-                fontFamily: "JetBrains Mono, monospace", fontSize: 10,
-                letterSpacing: ".18em", textTransform: "uppercase",
-                cursor: "pointer", zIndex: 10,
-                display: "flex", alignItems: "center", gap: 6,
-              }}
-            >
-              <span style={{ width: 8, height: 8, background: identityColor, display: "inline-block" }} />
-              {isYou ? "Daniel" : "Tanner"}
-              <span style={{ opacity: 0.5 }}>switch</span>
-            </button>
-          </div>
-        )}
-        {tab === "chart" && mapMode === "full" && (
+      {tab === "chart" && (
+        <>
+          {/* top bar: who's logged in, and which view of the map */}
           <div style={{
-            position: "absolute", inset: 0,
+            flexShrink: 0, height: 56, padding: "0 12px",
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+            background: P.paper, borderBottom: `1px solid ${P.ink}`,
+          }}>
+            <IdentityChip data={data} />
+            <div role="group" aria-label="Map view" style={{ display: "flex", border: `1px solid ${P.ink}` }}>
+              <button type="button" style={segBtn(mapMode === "gap" && !moved)} onClick={showBoats}
+                aria-pressed={mapMode === "gap"}>{mapMode === "gap" && moved ? "Recenter" : "Boats"}</button>
+              <button type="button" style={{ ...segBtn(mapMode === "full"), borderLeft: `1px solid ${P.ink}` }}
+                onClick={() => setMapMode("full")} aria-pressed={mapMode === "full"}>Full route</button>
+            </div>
+          </div>
+
+          {/* the map, centred in the space between the bars */}
+          <div style={{
+            flex: 1, minHeight: 0, position: "relative", overflow: "hidden",
             background: "#bca57a",
             backgroundImage:
               "repeating-linear-gradient(90deg,rgba(0,0,0,0.04) 0 1px,transparent 1px 80px)," +
               "repeating-linear-gradient(0deg,rgba(0,0,0,0.04) 0 1px,transparent 1px 80px)",
-            overflowY: "auto", WebkitOverflowScrolling: "touch",
-            display: "flex", justifyContent: "center", paddingBottom: 16,
           }}>
-            <div style={{ width: "100%", maxWidth: 520 }}>
-              <Chart data={data} />
-            </div>
-            <button
-              onClick={() => setMapMode("gap")}
-              style={{
-                position: "fixed", top: 12, left: 12, zIndex: 10,
-                height: 44, padding: "0 12px",
-                background: CHART_PALETTE.paper, color: CHART_PALETTE.ink,
-                border: `1px solid ${CHART_PALETTE.ink}`,
-                fontFamily: "JetBrains Mono, monospace", fontSize: 10,
-                letterSpacing: ".16em", textTransform: "uppercase", cursor: "pointer",
-              }}
-            >Zoom to boats</button>
-            <button
-              onClick={switchIdentity}
-              style={{
-                position: "fixed", top: 12, right: 12,
-                background: CHART_PALETTE.paper,
-                border: `1px solid ${CHART_PALETTE.ink}`,
-                padding: "6px 12px",
-                fontFamily: "JetBrains Mono, monospace", fontSize: 10,
-                letterSpacing: ".18em", textTransform: "uppercase",
-                cursor: "pointer", zIndex: 10,
-                display: "flex", alignItems: "center", gap: 6,
-              }}
-            >
-              <span style={{ width: 8, height: 8, background: identityColor, display: "inline-block" }} />
-              {isYou ? "Daniel" : "Tanner"}
-              <span style={{ opacity: 0.5 }}>switch</span>
-            </button>
+            {mapMode === "gap" ? (
+              <ZoomedChart data={data} zoom={zoom} setZoom={setZoom} pan={pan} setPan={setPan} />
+            ) : (
+              <div style={{ position: "absolute", inset: 0, padding: 10, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                <Chart data={data} />
+              </div>
+            )}
           </div>
-        )}
-        {tab === "log" && (
+
+          {/* summary strip + zoom controls, below the map */}
+          <div style={{
+            flexShrink: 0, padding: "8px 12px", minHeight: 60, boxSizing: "border-box",
+            display: "flex", alignItems: "center", gap: 12,
+            background: P.paper, borderTop: `1px solid ${P.ink}`,
+          }}>
+            {data.met ? (
+              <div style={{ flex: 1 }}>
+                <div style={label}>Met</div>
+                <div style={{ fontFamily: "Spectral, serif", fontSize: 17, fontStyle: "italic", color: P.redInk }}>the row is complete</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ flexShrink: 0 }}>
+                  <div style={label}>Still to row</div>
+                  <div style={{ fontFamily: "Spectral, serif", fontSize: 22, fontWeight: 600, lineHeight: 1.1, color: P.ink }}>
+                    {(data.gap / 1000).toFixed(1)} km
+                  </div>
+                </div>
+                <div style={{ width: 1, alignSelf: "stretch", background: P.ink, opacity: 0.3 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={label}>Meeting</div>
+                  <div style={{ fontFamily: "Spectral, serif", fontSize: 14, fontStyle: "italic", lineHeight: 1.25, color: P.ink }}>
+                    near {data.meeting.near.name}{eta ? <><br />{eta}</> : null}
+                  </div>
+                </div>
+              </>
+            )}
+            {mapMode === "gap" && (
+              <div style={{ display: "flex", gap: 6 }}>
+                <button type="button" aria-label="Zoom out" style={iconBtn} onClick={() => setZoom((z) => clampZoom(z / 1.5))}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={P.ink} strokeWidth="1.6" strokeLinecap="round"><path d="M2 8h12" /></svg>
+                </button>
+                <button type="button" aria-label="Zoom in" style={iconBtn} onClick={() => setZoom((z) => clampZoom(z * 1.5))}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={P.ink} strokeWidth="1.6" strokeLinecap="round"><path d="M8 2v12M2 8h12" /></svg>
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      {tab === "log" && (
+        <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
           <div style={{ position: "absolute", inset: 0 }}>
             <Logbook data={data} compact />
           </div>
-        )}
-      </div>
+        </div>
+      )}
       <div style={{
         height: 56, display: "flex",
-        background: CHART_PALETTE.paper,
-        borderTop: `1px solid ${CHART_PALETTE.ink}`,
+        background: P.paper,
+        borderTop: `1px solid ${P.ink}`,
         flexShrink: 0,
       }}>
         {[
@@ -391,10 +402,10 @@ function MobileApp({ data }) {
             onClick={() => setTab(t.id)}
             style={{
               flex: 1, border: 0, background: "transparent",
-              borderBottom: tab === t.id ? `2px solid ${CHART_PALETTE.ink}` : "2px solid transparent",
+              borderBottom: tab === t.id ? `2px solid ${P.ink}` : "2px solid transparent",
               display: "flex", flexDirection: "column", alignItems: "center",
               justifyContent: "center", gap: 3, cursor: "pointer",
-              color: tab === t.id ? CHART_PALETTE.ink : CHART_PALETTE.inkSoft,
+              color: tab === t.id ? P.ink : P.inkSoft,
             }}
           >
             <span style={{ fontSize: 18, lineHeight: 1 }}>{t.icon}</span>
@@ -418,10 +429,6 @@ function NauticalApp() {
   if (data.error) return <ErrorScreen message={data.error} />;
   if (isMobile) return <MobileApp data={data} />;
 
-  const switchIdentity = () => {
-    if (confirm("Switch user on this device?")) data.setIdentity(null);
-  };
-
   return (
     <div data-screen-label="Crossing · main" className="app-fill" style={{
       display: "grid", gridTemplateColumns: "minmax(0, 1fr) 460px",
@@ -440,32 +447,6 @@ function NauticalApp() {
         padding: "24px 28px",
         overflow: "hidden",
       }}>
-        <Chart data={data} />
-
-        {/* Identity chip */}
-        <button
-          onClick={switchIdentity}
-          style={{
-            position: "absolute", top: 16, right: 16,
-            background: CHART_PALETTE.paper,
-            border: `1px solid ${CHART_PALETTE.ink}`,
-            color: CHART_PALETTE.ink,
-            padding: "6px 12px",
-            fontFamily: "JetBrains Mono, monospace", fontSize: 9,
-            letterSpacing: ".18em", textTransform: "uppercase",
-            cursor: "pointer",
-            zIndex: 2,
-            display: "flex", alignItems: "center", gap: 6,
-          }}
-        >
-          <span style={{
-            width: 8, height: 8, display: "inline-block",
-            background: data.identity === "you" ? CHART_PALETTE.redInk : CHART_PALETTE.brass,
-          }} />
-          {data.identity === "you" ? "Daniel" : "Tanner"}
-          <span style={{ opacity: 0.5, marginLeft: 4 }}>switch</span>
-        </button>
-
         {/* Marginalia on the chart "table" */}
         <div style={{
           position: "absolute", left: 22, top: 0, bottom: 0,
@@ -487,10 +468,15 @@ function NauticalApp() {
             HEIGHTS<br />IN<br />FEET
           </div>
         </div>
+
+        {/* the chart, centred on the table above the marginalia */}
+        <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", justifyContent: "center", minWidth: 0 }}>
+          <Chart data={data} />
+        </div>
       </div>
 
       {/* Logbook */}
-      <Logbook data={data} />
+      <Logbook data={data} headerRight={<IdentityChip data={data} compact />} />
     </div>
   );
 }
