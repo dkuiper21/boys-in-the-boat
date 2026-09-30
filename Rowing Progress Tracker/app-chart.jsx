@@ -298,10 +298,17 @@ function Shell({ x, y, heading, color }) {
   const ink = CHART_PALETTE.ink;
   return (
     <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${heading.toFixed(1)})`}>
-      <path d="M -9,-3 L -3,-15 M -9,3 L -3,15 M 1,-3 L 7,-15 M 1,3 L 7,15"
-        stroke={ink} strokeWidth="1.1" strokeLinecap="round" fill="none" />
-      <path d="M -4.6,-15.6 L -1.4,-14.4 L -2,-17 Z M -4.6,15.6 L -1.4,14.4 L -2,17 Z M 5.4,-15.6 L 8.6,-14.4 L 8,-17 Z M 5.4,15.6 L 8.6,14.4 L 8,17 Z"
-        fill={ink} />
+      {/* two rowers, each with a pair of sculls: straight shafts sweeping
+          slightly aft, flat spoon blades lying along the shaft */}
+      {[-7, 3].map((rx) => [1, -1].map((side) => (
+        <g key={`${rx}${side}`}>
+          <line x1={rx} y1={side * 3} x2={rx - 2.5} y2={side * 15}
+            stroke={ink} strokeWidth="1.1" strokeLinecap="round" />
+          <ellipse cx={rx - 3.1} cy={side * 17.8} rx="3.4" ry="1.4"
+            transform={`rotate(${side * 101.8} ${rx - 3.1} ${side * 17.8})`}
+            fill={ink} />
+        </g>
+      )))}
       <path d="M -22,0 Q -12,-4.2 6,-3.6 Q 18,-2.2 25,0 Q 18,2.2 6,3.6 Q -12,4.2 -22,0 Z"
         fill={color} stroke={ink} strokeWidth="1.2" />
       <line x1="-14" y1="0" x2="16" y2="0" stroke={CHART_PALETTE.paper} strokeWidth="0.8" opacity="0.7" />
